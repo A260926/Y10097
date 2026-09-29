@@ -1,4 +1,7 @@
 ## Changelog
+#### v5.0.25
+  - added: opt-in route introspection API - `explain(router, request)` and `fingerprint(router)`
+    (also available via the `itty-router/explain` subpath)
 
 #### v5.0.24
   - fixed: greedy param (/a/:b+) would reject /a but accept /a/ (bad)

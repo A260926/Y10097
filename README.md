@@ -50,6 +50,57 @@ export default { ...router } // strips the proxy
 // that's it ^-^
 ```
 
+## Route introspection (opt-in)
+
+For tooling, deploy diffing, or debugging, `explain` reports which route a
+request **would** hit without executing any handler (no `before`, route,
+`catch`, or `finally` stages run), and without mutating
+`request.query`/`params`/`route`/`proxy`. It shares the exact same route
+compilation and matching logic as `fetch`.
+
+```js
+import { Router, explain, fingerprint } from 'itty-router'
+
+const router = Router()
+  .get('/users/:id', () => {})
+  .post('/users', () => {})
+  .all('/admin/*', () => {})
+
+const result = explain(router, new Request('https://x.com/users/13'))
+// {
+//   pathname: '/users/13',
+//   method: 'GET',
+//   routes: [
+//     { index: 0, method: 'GET', route: '/users/:id', pattern: '...',
+//       handlerCount: 1, methodMatched: true, patternMatched: true,
+//       matched: true, skipped: null },
+//     { index: 1, method: 'POST', route: '/users', ...,
+//       methodMatched: false, patternMatched: undefined, skipped: 'method' },
+//     { index: 2, method: 'ALL', route: '/admin/*', ...,
+//       methodMatched: true, patternMatched: false, skipped: 'pattern' },
+//   ],
+//   route: '/users/:id',
+//   params: { id: '13' },
+// }
+```
+
+`fingerprint` returns a cross-process-stable hash of the observable route
+table. It is derived solely from the method, cleaned route string, compiled
+pattern, and handler count — never handler source code or object identity,
+and never query strings (repeated query keys included). Adding/removing a
+route or changing registration order changes the hash; identical
+registrations (even in separate processes or ESM/CJS builds) share it.
+
+```js
+const a = fingerprint(routerA).hash
+const b = fingerprint(routerB).hash
+a === b // true when both instances loaded the same configuration
+```
+
+Both functions also accept a minimal `{ method, url }` RequestLike object,
+and each returned explanation/fingerprint is a frozen snapshot unaffected by
+routes registered afterwards.
+
 <br />
 
 ## Need Help?

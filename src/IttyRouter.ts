@@ -5,6 +5,7 @@ import {
   RequestHandler,
   RequestLike,
 } from './types'
+import { compileRoute, matchRoute } from './route.ignore.shared'
 
 export const IttyRouter = <
   RequestType extends IRequest = IRequest,
@@ -14,24 +15,9 @@ export const IttyRouter = <
 // @ts-ignore
   ({
     __proto__: new Proxy({}, {
-      // @ts-expect-error (we're adding an expected prop "path" to the get)
-      get: (target: any, prop: string, receiver: object, path: string) =>
+      get: (target: any, prop: string, receiver: object) =>
         (route: string, ...handlers: RequestHandler<RequestType, Args>[]) =>
-          routes.push(
-            [
-              prop.toUpperCase(),
-              RegExp(`^${(path = (base + route)
-                .replace(/\/+(\/|$)/g, '$1'))                       // strip double & trailing splash
-                .replace(/(\/?\.?):(\w+)\+/g, '($1(?<$2>[^]+))')    // greedy params
-                .replace(/(\/?\.?):(\w+)/g, '($1(?<$2>[^$1/]+?))')  // named params and image format
-                .replace(/\./g, '\\.')                              // dot in path
-                .replace(/(\/?)\*/g, '($1.*)?')                     // wildcard
-              }/*$`),
-              // @ts-ignore
-              handlers,                                             // embed handlers
-              path,                                                 // embed clean route path
-            ]
-          ) && receiver
+          routes.push(compileRoute(base, prop.toUpperCase(), route, handlers)) && receiver
     }),
     routes,
     ...other,
@@ -46,8 +32,9 @@ export const IttyRouter = <
         query[k] = query[k] ? ([] as string[]).concat(query[k], v) : v
 
       // 2. then test routes
-      for (let [method, regex, handlers, path] of routes)
-        if ((method == request.method || method == 'ALL') && (match = url.pathname.match(regex))) {
+      for (let route of routes)
+        if ((match = matchRoute(route, request.method, url.pathname))) {
+          const [, , handlers, path] = route
           request.params = match.groups || {}                                     // embed params in request
           request.route = path                                                    // embed route path in request
           for (let handler of handlers)

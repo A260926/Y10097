@@ -31,6 +31,11 @@
       "types": "./error.d.ts",
       "require": "./error.js"
     },
+    "./explain": {
+      "import": "./explain.mjs",
+      "types": "./explain.d.ts",
+      "require": "./explain.js"
+    },
     "./html": {
       "import": "./html.mjs",
       "types": "./html.d.ts",
