@@ -52,6 +52,50 @@ export default { ...router } // strips the proxy
 
 <br />
 
+## Route Introspection (opt-in)
+
+For deploy tooling and config diffing, the router can explain which route a
+request *would* hit — without executing a single handler (no `before`, route,
+`catch`, or `finally` stage runs, and `request.query`/`params`/`route`/`proxy`
+are never touched). Import the opt-in `explain` and `fingerprint` helpers from
+`itty-router` (or the tree-shakeable `itty-router/explain` entry).
+
+```js
+import { Router, explain, fingerprint } from 'itty-router'
+
+const router = Router({ base: '/api' })
+router
+  .get('/users/:id+', () => 'user')
+  .post('/users', () => 'create')
+  .all('*', () => 'missing')
+
+// which route would GET /api/users/13/profile hit?
+const result = explain(router, new Request('https://api.example.com/api/users/13/profile'))
+
+result.pathname   // '/api/users/13/profile'
+result.method     // 'GET'
+result.route      // '/api/users/:id+' (first hit, null if none)
+result.params     // { id: '13/profile' }
+result.routes     // every route, in registration order:
+                  //   method, route, pattern, handlers,
+                  //   matched (first hit?), skipped (false | 'method' | 'pattern'), params
+
+// stable fingerprint of the route table (method + cleaned route + compiled
+// pattern + handler count). Identical registrations produce identical hashes
+// across processes; adding or reordering routes changes the hash.
+fingerprint(router) // e.g. 'c8cb7aca'
+```
+
+`explain` accepts a `Request` or a minimal `{ method, url }`, and returns a
+frozen snapshot — registering more routes afterwards never mutates an earlier
+result. Matching shares the exact same route compilation pipeline as `fetch`
+(base paths, duplicate/trailing slashes, named/greedy params, optional
+wildcards, dots, and the `ALL` method all behave identically). Duplicate query
+keys never affect the fingerprint, and handler function sources/identities are
+never read.
+
+<br />
+
 ## Need Help?
 [Complete API documentation](https://itty.dev/itty-router) is available on [itty.dev](https://itty.dev/itty-router), or join our [Discord](https://discord.gg/53vyrZAu9u) channel to chat with community members for quick help!
 

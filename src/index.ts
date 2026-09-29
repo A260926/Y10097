@@ -3,6 +3,9 @@ export * from './IttyRouter'
 export * from './Router'
 export * from './AutoRouter'
 
+// route introspection (opt-in)
+export * from './explain'
+
 // classes
 export * from './StatusError'
 

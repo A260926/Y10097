@@ -1,3 +1,4 @@
+import { compileRoute, matchRoute } from './internal/route'
 import {
   IRequest,
   RequestHandler,
@@ -13,24 +14,9 @@ export const Router = <
 >({ base = '', routes = [], ...other }: RouterOptions<RequestType, Args> = {}): RouterType<RequestType, Args, ResponseType> =>
   ({
     __proto__: new Proxy({}, {
-      // @ts-expect-error (we're adding an expected prop "path" to the get)
-      get: (target: any, prop: string, receiver: object, path: string) =>
+      get: (target: any, prop: string, receiver: object) =>
         (route: string, ...handlers: RequestHandler<RequestType, Args>[]) =>
-          routes.push(
-            [
-              prop.toUpperCase?.(),
-              RegExp(`^${(path = (base + route)
-                .replace(/\/+(\/|$)/g, '$1'))                       // strip double & trailing splash
-                .replace(/(\/?\.?):(\w+)\+/g, '($1(?<$2>[^]+))')    // greedy params
-                .replace(/(\/?\.?):(\w+)/g, '($1(?<$2>[^$1/]+?))')  // named params and image format
-                .replace(/\./g, '\\.')                              // dot in path
-                .replace(/(\/?)\*/g, '($1.*)?')                     // wildcard
-              }/*$`),
-              // @ts-ignore
-              handlers,                                             // embed handlers
-              path,                                                 // embed clean route path
-            ]
-          ) && receiver
+          routes.push(compileRoute(prop.toUpperCase?.(), route, handlers, base)) && receiver
     }),
     routes,
     ...other,
@@ -49,12 +35,12 @@ export const Router = <
           if ((response = await handler(request.proxy ?? request, ...args)) != null) break t
 
         // 2. then test routes
-        outer: for (let [method, regex, handlers, path] of routes)
-          if ((method == request.method || method == 'ALL') && (match = url.pathname.match(regex))) {
+        outer: for (let route of routes)
+          if ((match = matchRoute(route, request.method, url.pathname))) {
             request.params = match.groups || {}                                     // embed params in request
-            request.route = path                                                    // embed route path in request
+            request.route = route[3]                                                // embed route path in request
 
-            for (let handler of handlers)
+            for (let handler of route[2])
               if ((response = await handler(request.proxy ?? request, ...args)) != null) break outer
           }
       } catch (err: any) {
